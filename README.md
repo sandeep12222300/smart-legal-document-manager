@@ -1,342 +1,182 @@
 # Smart Legal Document Manager
 
-A **production-ready backend API** that gives lawyers a lightweight version control system for legal documents — with immutable versioning, content-diff comparison, and an async change-notification system.
-
-Built with **Python · FastAPI · SQLAlchemy · SQLite** (swappable to PostgreSQL).
+A professional backend system built with **FastAPI** to help legal professionals manage documents with full version history, track precise changes, and maintain a reliable audit trail.
 
 ---
 
-## Table of Contents
-
-1. [Project Overview](#project-overview)
-2. [Installation](#installation)
-3. [Running the Server](#running-the-server)
-4. [API Reference & Example Requests](#api-reference--example-requests)
-5. [How Versioning Works](#how-versioning-works)
-6. [How Diff Comparison Works](#how-diff-comparison-works)
-7. [Async Notification System](#async-notification-system)
-8. [Project Structure](#project-structure)
-9. [Running Tests](#running-tests)
+## 1. Project Overview
+The **Smart Legal Document Manager** is a specialized version control system for legal documents. In legal environments, every modification is critical. This system ensures:
+- **Immutable Versioning**: Every save creates a permanent, unchangeable record.
+- **Change Tracking**: Deep inspection of added, removed, or modified clauses.
+- **Audit Trails**: A transparent history of who edited the document and when.
 
 ---
 
-## Project Overview
-
-| Feature | Description |
-|---|---|
-| **Document Management** | Create, read, update title, and delete legal documents |
-| **Immutable Versioning** | Every edit creates a new version; old content is never overwritten |
-| **Duplicate Guard** | SHA-256 content hashing prevents identical versions |
-| **Diff Comparison** | Line-level diff between any two versions (added / removed / modified) |
-| **Smart Notifications** | Background alerts only triggered for significant changes (similarity < 98%) |
-| **Audit Trail** | Every version records author name and timestamp |
-| **Safe Deletion** | `?hard=true` query guard prevents accidental data loss |
+## 2. Features
+- **Document creation with automatic versioning**: Version 1 is automatically initialized upon document creation.
+- **Immutable version history**: Historic versions are locked to prevent retroactive tampering.
+- **Structured version comparison**: Identifies **added**, **removed**, and **modified** lines between any two versions.
+- **Smart notification system**: Analyzes change significance and sends alerts for substantial edits.
+- **Metadata updates without creating a new version**: Update titles and global properties without polluting history.
+- **Safe deletion of versions and documents**: Guarded deletion endpoints to prevent accidental data loss.
+- **REST API built with FastAPI**: High-performance, type-safe API with automatic documentation.
+- **Automated tests**: Robust test suite ensuring reliability for critical legal data.
 
 ---
 
-## Installation
+## 3. Technology Stack
+- **Python**: Core language.
+- **FastAPI**: Modern, high-performance web framework.
+- **SQLAlchemy**: Database ORM.
+- **SQLite (or PostgreSQL)**: Flexible database support (SQLite by default for easy setup).
+- **Pydantic**: Data validation and type safety.
+- **Pytest**: Industry-standard automated testing.
+- **difflib**: Text comparison algorithm.
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/yourname/smart-legal-document-manager.git
-cd smart-legal-document-manager
+---
 
-# 2. Create and activate a virtual environment
-python -m venv venv
+## 4. Project Structure
+```text
+app/
+├── database.py          # Database connection and engine setup
+├── models.py            # SQLAlchemy ORM models (Document, Version)
+├── schemas.py           # Pydantic models for request/response validation
+├── main.py              # Application entry point and lifespan management
+├── routes/
+│   └── document_routes.py # REST API endpoints
+├── services/
+│   ├── diff_service.py    # Logic for version comparison
+│   ├── document_service.py # Business logic for document management
+│   ├── version_service.py  # Logic for handling document versions
+│   └── notification_service.py # Smart change notifications
+└── utils/
+    └── hash_utils.py       # Hashing for duplicate detection
 
-# Windows
-venv\Scripts\activate
+tests/
+├── conftest.py          # Test fixtures and memory-DB setup
+└── test_documents.py    # API integration tests
 
-# macOS / Linux
-source venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-```
-
-### PostgreSQL (optional, production)
-
-The app uses **SQLite** by default (`legal_docs.db` in the project root).
-To use PostgreSQL, set the environment variable:
-
-```bash
-$env:DATABASE_URL = "postgresql+psycopg2://user:password@localhost/legal_docs"
+requirements.txt         # Project dependencies
+README.md                # Documentation
 ```
 
 ---
 
-## Running the Server
+## 5. Installation Instructions
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/bandisandeep/smart-legal-doc-manager.git
+   cd smart-legal-doc-manager
+   ```
+2. **Install dependencies using pip**:
+   ```bash
+   python -m venv .venv
+   # Windows:
+   .venv\Scripts\activate
+   # macOS/Linux:
+   source .venv/bin/activate
 
+   pip install -r requirements.txt
+   ```
+3. **Start FastAPI server using uvicorn**:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+---
+
+## 6. Running the Server
+Run the application with:
 ```bash
 uvicorn app.main:app --reload
 ```
-
-The server starts at **http://127.0.0.1:8000**.
-
-| URL | Description |
-|---|---|
-| `http://127.0.0.1:8000/docs` | Interactive Swagger UI |
-| `http://127.0.0.1:8000/redoc` | ReDoc documentation |
-| `http://127.0.0.1:8000/` | Health check |
+The API documentation is available at:
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 ---
 
-## API Reference & Example Requests
+## 7. User Guide – How to Test Features
+Test the system using the built-in **Swagger UI** at `/docs`.
 
-### 1 — Create a Document
-
-```bash
-curl -X POST http://127.0.0.1:8000/documents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Service Agreement",
-    "content": "Payment shall be made within 10 days of invoice.",
-    "author": "Alice"
-  }'
-```
-
-**Response (201)**
+### Creating a Document
+- **POST `/documents`**
 ```json
 {
-  "id": 1,
-  "title": "Service Agreement",
-  "created_by": "Alice",
-  "created_at": "2026-03-13T17:00:00+00:00"
+  "title": "Employment Contract",
+  "content": "Section 1: Work hours are 9 AM to 5 PM.",
+  "author": "Legal Team"
 }
 ```
 
----
-
-### 2 — Upload a New Version
-
-```bash
-curl -X POST http://127.0.0.1:8000/documents/1/versions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Payment shall be made within 30 days of invoice.",
-    "author": "Bob"
-  }'
-```
-
-**Response (201)**
+### Uploading a New Version
+- **POST `/documents/{id}/versions`**
 ```json
 {
-  "id": 2,
-  "document_id": 1,
-  "version_number": 2,
-  "content": "Payment shall be made within 30 days of invoice.",
-  "content_hash": "a1b2c3...",
-  "created_by": "Bob",
-  "created_at": "2026-03-13T17:05:00+00:00"
+  "content": "Section 1: Work hours are 9 AM to 6 PM.",
+  "author": "HR Director"
 }
 ```
 
-> If content is identical to the latest version, the API returns **409 Conflict**.
+### Listing Versions
+- **GET `/documents/{id}/versions`**
+Lists all versions, including timestamps, hashes, and authors.
 
----
+### Comparing Two Versions
+- **GET `/documents/{id}/compare?v1=1&v2=2`**
+Returns a structured diff showing that "5 PM" was changed to "6 PM".
 
-### 3 — Get Version History
-
-```bash
-curl http://127.0.0.1:8000/documents/1/versions
-```
-
-Returns an array of all versions in ascending order.
-
----
-
-### 4 — Compare Two Versions
-
-```bash
-curl "http://127.0.0.1:8000/documents/1/compare?v1=1&v2=2"
-```
-
-**Response (200)**
+### Updating Document Title
+- **PATCH `/documents/{id}/title`**
 ```json
 {
-  "document_id": 1,
-  "version_1": 1,
-  "version_2": 2,
-  "added": [],
-  "removed": [],
-  "modified": [
-    {
-      "before": "Payment shall be made within 10 days of invoice.",
-      "after":  "Payment shall be made within 30 days of invoice."
-    }
-  ],
-  "summary": "Comparing version 1 → 2: 1 line(s) modified."
+  "title": "2024 Revised Employment Contract"
 }
 ```
 
+### Deleting a Version
+- **DELETE `/documents/{doc_id}/versions/{version_id}`**
+Removes a specific version only.
+
+### Deleting a Document
+- **DELETE `/documents/{id}?hard=true`**
+Removes the entire document and all its history.
+
 ---
 
-### 5 — Update Document Title
+## 8. Comparison Logic Explanation
+The system uses Python's **`difflib`** library to analyze changes between versions.
 
+### Algorithm Behavior:
+1. **Added lines**: Lines present in the new version but not the old (prefixed with `+`).
+2. **Removed lines**: Lines present in the old version but deleted in the new (prefixed with `-`).
+3. **Modified lines**: Detected when a removal is immediately followed by an addition, suggesting an in-place edit of a clause.
+
+The system also calculates a **similarity score** using `SequenceMatcher` (from `difflib`). This score is used by the notification service to ignore "insignificant" edits (e.g., whitespace or minor typos) and only alert users when substantial changes are made.
+
+---
+
+## 9. Running Tests
+The project uses `pytest` for quality assurance.
 ```bash
-curl -X PATCH http://127.0.0.1:8000/documents/1/title \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Amended Service Agreement"}'
+pytest
 ```
-
-Updates only the title. **No new version is created.**
+Tests cover:
+- **Document creation**: Verifying initial setup and auto-versioning.
+- **Versioning**: Ensuring increments and content integrity.
+- **Comparison**: Validating the accuracy of the diff engine.
+- **Metadata updates**: Confirming titles can be changed safely.
 
 ---
 
-### 6 — Delete a Single Version
-
-```bash
-curl -X DELETE http://127.0.0.1:8000/documents/1/versions/2
-```
-
-Removes version with `id=2`. Other versions are unaffected.
-
----
-
-### 7 — Delete Entire Document
-
-```bash
-curl -X DELETE "http://127.0.0.1:8000/documents/1?hard=true"
-```
-
-The `?hard=true` flag is **required** as a safety guard.
-Removes the document and all its versions permanently.
+## 10. Future Improvements
+- **Authentication**: Implementing user sign-in and role-based access.
+- **Email notifications**: Connecting the mock service to a real SMTP or SendGrid provider.
+- **Frontend UI**: Building a visual dashboard for legal clerks.
+- **Docker deployment**: Creating a `Dockerfile` for easy cloud scaling.
+- **Support for large documents**: Optimizing diff processing for extensive filings.
 
 ---
 
-## How Versioning Works
-
-```
-Document Created
-      │
-      ▼
-  Version 1  ──── SHA-256 hash stored ────┐
-      │                                   │
-      │  (user uploads new content)       │
-      ▼                                   │
-  Hash new content ─── matches? ─── YES → 409 Reject
-      │ NO
-      ▼
-  version_number = max(existing) + 1
-      │
-      ▼
-  Version N  saved (immutable) ←─ NEVER overwritten
-```
-
-**Key rules:**
-- Versions are **append-only** — content is never modified after creation.
-- Each version stores `content_hash` (SHA-256) to enable O(1) duplicate detection.
-- Version numbers start at 1 and always increment by 1.
-- Deleting a version does **not** renumber others (audit integrity).
-
----
-
-## How Diff Comparison Works
-
-The comparison engine uses Python's built-in `difflib.ndiff()` algorithm.
-
-`ndiff` annotates every line with a prefix:
-- `"  "` — line unchanged
-- `"- "` — line removed (only in v1)
-- `"+ "` — line added (only in v2)
-- `"? "` — inline hint (ignored)
-
-**Modified line detection:**
-If a removed line (`"- "`) is immediately followed by an added line (`"+ "`), the engine classifies this as a **modification** rather than a separate removal + addition. This produces human-readable output like:
-
-```json
-{
-  "before": "Payment within 10 days",
-  "after":  "Payment within 30 days"
-}
-```
-
-This approach is far more useful to lawyers than a raw unified diff patch.
-
----
-
-## Async Notification System
-
-When a new version is saved, the API fires a **FastAPI BackgroundTask** that:
-
-1. Computes a **SequenceMatcher similarity score** between old and new content.
-2. If `similarity >= 0.98` → change is trivial → **no notification sent**.
-3. If `similarity < 0.98` → change is significant → notification triggered.
-
-```
-New version uploaded
-        │
-        │  (HTTP response returned immediately — user does NOT wait)
-        │
-        ▼ (background task)
-  similarity = SequenceMatcher(old, new).ratio()
-        │
-        ├─ >= 0.98 → SKIP (trivial change logged)
-        │
-        └─ < 0.98  → ALERT logged + email placeholder printed
-```
-
-In production, replace `_send_email_placeholder()` in `notification_service.py`
-with your SMTP / SendGrid / Slack webhook call.
-
----
-
-## Project Structure
-
-```
-smart-legal-document-manager/
-│
-├── app/
-│   ├── main.py                  # FastAPI app, startup, middleware
-│   ├── database.py              # SQLAlchemy engine + session + Base
-│   ├── models.py                # ORM models: Document, DocumentVersion
-│   ├── schemas.py               # Pydantic v2 request/response schemas
-│   │
-│   ├── routes/
-│   │   └── document_routes.py   # All REST endpoints
-│   │
-│   ├── services/
-│   │   ├── document_service.py  # Document CRUD logic
-│   │   ├── version_service.py   # Version management + deduplication
-│   │   ├── diff_service.py      # difflib-based comparison engine
-│   │   └── notification_service.py  # Async change notification
-│   │
-│   └── utils/
-│       └── hash_utils.py        # SHA-256 content hashing
-│
-├── tests/
-│   ├── conftest.py              # In-memory SQLite test fixtures
-│   └── test_documents.py        # 8 integration test cases
-│
-├── requirements.txt
-└── README.md
-```
-
----
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-```
-
-Expected output:
-
-```
-tests/test_documents.py::test_create_document_returns_201          PASSED
-tests/test_documents.py::test_version_1_auto_created               PASSED
-tests/test_documents.py::test_new_version_increments_version_number PASSED
-tests/test_documents.py::test_duplicate_content_rejected            PASSED
-tests/test_documents.py::test_compare_returns_structured_diff       PASSED
-tests/test_documents.py::test_title_patch_does_not_create_new_version PASSED
-tests/test_documents.py::test_delete_single_version                 PASSED
-tests/test_documents.py::test_hard_delete_removes_document_and_versions PASSED
-
-8 passed in X.XXs
-```
-
-Run with coverage:
-
-```bash
-pytest tests/ -v --tb=short
-```
+## 11. Author
+**B Sandeep**
