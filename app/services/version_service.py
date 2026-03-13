@@ -8,7 +8,6 @@ Key invariants enforced here:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from fastapi import HTTPException, status
 
 from app.models import Document, DocumentVersion
@@ -171,9 +170,32 @@ def delete_version(db: Session, document_id: int, version_id: int) -> None:
     """
     Delete a single document version by its primary key ID.
 
-    Note: This does NOT renumber remaining versions to preserve audit integrity.
+    Guard rails:
+      - The only remaining version cannot be deleted (use document hard delete).
+      - The latest version cannot be deleted to preserve append-only numbering.
     """
     version = get_version_by_id_or_404(db, document_id, version_id)
+    versions = get_versions(db, document_id)
+
+    if len(versions) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Cannot delete the only remaining version. "
+                "Use DELETE /documents/{id}?hard=true to remove full history explicitly."
+            ),
+        )
+
+    latest_version = versions[-1]
+    if version.id == latest_version.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Cannot delete the latest version. "
+                "This document keeps append-only history for audit traceability."
+            ),
+        )
+
     try:
         db.delete(version)
         db.commit()

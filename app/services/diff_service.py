@@ -19,6 +19,7 @@ in the diff output — this strongly implies the same logical line was edited.
 """
 
 import difflib
+import re
 from app.schemas import DiffResponse, ModifiedLine
 
 
@@ -109,9 +110,18 @@ def compare_versions(
     )
 
 
+def _normalize_for_similarity(text: str) -> str:
+    """Normalize text so whitespace-only edits are treated as trivial."""
+    return re.sub(r"\s+", "", text)
+
+
 def similarity_score(text_a: str, text_b: str) -> float:
     """
     Return a similarity ratio in [0.0, 1.0] between two strings.
-    1.0 means identical; values close to 1.0 indicate trivial changes.
+
+    Whitespace is normalized away so spacing/newline-only edits do not
+    trigger significance notifications.
     """
-    return difflib.SequenceMatcher(None, text_a, text_b).ratio()
+    normalized_a = _normalize_for_similarity(text_a)
+    normalized_b = _normalize_for_similarity(text_b)
+    return difflib.SequenceMatcher(None, normalized_a, normalized_b).ratio()

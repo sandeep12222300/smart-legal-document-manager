@@ -177,8 +177,8 @@ def compare_versions(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a specific version",
     description=(
-        "Removes a single version by its **primary key ID** (not version number). "
-        "The remaining versions retain their original version numbers."
+        "Removes a single non-latest version by its **primary key ID** (not version number). "
+        "Safety rules: the latest version and the only remaining version cannot be deleted."
     ),
 )
 def delete_version(

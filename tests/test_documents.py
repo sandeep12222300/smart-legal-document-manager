@@ -17,6 +17,8 @@ Test Coverage:
 
 import pytest
 
+from app.services.diff_service import similarity_score
+
 
 CONTENT_V1 = "Payment shall be made within 10 days of invoice."
 CONTENT_V2 = "Payment shall be made within 30 days of invoice."
@@ -137,7 +139,28 @@ def test_title_patch_does_not_create_new_version(client):
 
 
 def test_delete_single_version(client):
-    """DELETEing a version by its ID should remove it but leave the document intact."""
+    """DELETEing a non-latest version by its ID should remove it and keep the document intact."""
+    doc = _create_doc(client)
+
+    v2_resp = client.post(
+        f"/documents/{doc['id']}/versions",
+        json={"content": CONTENT_V2, "author": "Frank"},
+    )
+    assert v2_resp.status_code == 201
+
+    versions_before = client.get(f"/documents/{doc['id']}/versions").json()
+    v1 = next(v for v in versions_before if v["version_number"] == 1)
+
+    del_resp = client.delete(f"/documents/{doc['id']}/versions/{v1['id']}")
+    assert del_resp.status_code == 204
+
+    versions_after = client.get(f"/documents/{doc['id']}/versions").json()
+    assert len(versions_after) == 1
+    assert versions_after[0]["version_number"] == 2
+
+
+def test_delete_latest_version_rejected(client):
+    """Latest version delete should be blocked to preserve append-only history."""
     doc = _create_doc(client)
 
     v2_resp = client.post(
@@ -147,11 +170,26 @@ def test_delete_single_version(client):
     v2 = v2_resp.json()
 
     del_resp = client.delete(f"/documents/{doc['id']}/versions/{v2['id']}")
-    assert del_resp.status_code == 204
+    assert del_resp.status_code == 400
+    assert "latest version" in del_resp.json()["detail"].lower()
 
-    versions = client.get(f"/documents/{doc['id']}/versions").json()
-    assert len(versions) == 1
-    assert versions[0]["version_number"] == 1
+
+def test_delete_only_version_rejected(client):
+    """Single remaining version delete should be blocked to avoid accidental history wipe."""
+    doc = _create_doc(client)
+    v1 = client.get(f"/documents/{doc['id']}/versions").json()[0]
+
+    del_resp = client.delete(f"/documents/{doc['id']}/versions/{v1['id']}")
+    assert del_resp.status_code == 400
+    assert "only remaining version" in del_resp.json()["detail"].lower()
+
+
+def test_similarity_score_ignores_whitespace_only_changes():
+    """Whitespace-only edits should be treated as trivial for notification significance."""
+    old_text = "Section 1: Payment terms.\nClause A applies."
+    new_text = "  Section 1:  Payment terms. \n\nClause A applies.   "
+
+    assert similarity_score(old_text, new_text) == pytest.approx(1.0)
 
 
 def test_hard_delete_removes_document_and_versions(client):
@@ -170,3 +208,4 @@ def test_hard_delete_removes_document_and_versions(client):
 
     resp_versions = client.get(f"/documents/{doc['id']}/versions")
     assert resp_versions.status_code == 404
+

@@ -136,7 +136,11 @@ Returns a structured diff showing that "5 PM" was changed to "6 PM".
 
 ### Deleting a Version
 - **DELETE `/documents/{doc_id}/versions/{version_id}`**
-Removes a specific version only.
+- Guard rails:
+  - You can delete a non-latest version only.
+  - You cannot delete the latest version.
+  - You cannot delete the only remaining version.
+  - To remove full history, use hard document delete.
 
 ### Deleting a Document
 - **DELETE `/documents/{id}?hard=true`**
@@ -152,7 +156,7 @@ The system uses Python's **`difflib`** library to analyze changes between versio
 2. **Removed lines**: Lines present in the old version but deleted in the new (prefixed with `-`).
 3. **Modified lines**: Detected when a removal is immediately followed by an addition, suggesting an in-place edit of a clause.
 
-The system also calculates a **similarity score** using `SequenceMatcher` (from `difflib`). This score is used by the notification service to ignore "insignificant" edits (e.g., whitespace or minor typos) and only alert users when substantial changes are made.
+The system also calculates a **similarity score** using `SequenceMatcher` (from `difflib`) on normalized text where whitespace is ignored. This ensures spacing/newline-only edits are treated as trivial, and notifications are only sent for meaningful content changes.
 
 ---
 

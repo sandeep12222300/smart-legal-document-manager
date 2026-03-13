@@ -33,48 +33,49 @@ def notify_significant_change(
     notification.  This function is designed to be scheduled as a
     FastAPI BackgroundTask — it does NOT block the HTTP response.
 
-    Args:
-        document_id:      ID of the affected document.
-        document_title:   Title for display in the notification message.
-        version_number:   The newly created version number.
-        author:           Name of the user who made the change.
-        old_content:      Full text of the previous version.
-        new_content:      Full text of the new version.
+    Any notification-side failure is logged and swallowed so it cannot
+    affect already-committed document/version writes.
     """
-    score = similarity_score(old_content, new_content)
-    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        score = similarity_score(old_content, new_content)
+        timestamp = datetime.now(timezone.utc).isoformat()
 
-    if score >= TRIVIAL_SIMILARITY_THRESHOLD:
-        logger.info(
-            "[Notification] SKIPPED — trivial change detected "
-            "(similarity=%.4f) for document '%s' (id=%d) version %d.",
-            score, document_title, document_id, version_number,
+        if score >= TRIVIAL_SIMILARITY_THRESHOLD:
+            logger.info(
+                "[Notification] SKIPPED — trivial change detected "
+                "(similarity=%.4f) for document '%s' (id=%d) version %d.",
+                score, document_title, document_id, version_number,
+            )
+            return
+
+        logger.warning(
+            "[Notification] SIGNIFICANT CHANGE on document '%s' (id=%d)\n"
+            "  ▸ New version : %d\n"
+            "  ▸ Edited by   : %s\n"
+            "  ▸ Similarity  : %.4f (threshold=%.2f)\n"
+            "  ▸ Timestamp   : %s",
+            document_title, document_id,
+            version_number,
+            author,
+            score, TRIVIAL_SIMILARITY_THRESHOLD,
+            timestamp,
         )
-        return
 
-                                                                               
-    logger.warning(
-        "[Notification] SIGNIFICANT CHANGE on document '%s' (id=%d)\n"
-        "  ▸ New version : %d\n"
-        "  ▸ Edited by   : %s\n"
-        "  ▸ Similarity  : %.4f (threshold=%.2f)\n"
-        "  ▸ Timestamp   : %s",
-        document_title, document_id,
-        version_number,
-        author,
-        score, TRIVIAL_SIMILARITY_THRESHOLD,
-        timestamp,
-    )
-
-                                                                                
-    _send_email_placeholder(
-        document_id=document_id,
-        document_title=document_title,
-        version_number=version_number,
-        author=author,
-        similarity=score,
-        timestamp=timestamp,
-    )
+        _send_email_placeholder(
+            document_id=document_id,
+            document_title=document_title,
+            version_number=version_number,
+            author=author,
+            similarity=score,
+            timestamp=timestamp,
+        )
+    except Exception:
+        logger.exception(
+            "[Notification] FAILED for document '%s' (id=%d) version %d.",
+            document_title,
+            document_id,
+            version_number,
+        )
 
 
 def _send_email_placeholder(
